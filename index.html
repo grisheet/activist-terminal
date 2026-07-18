@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Activist Terminal — Shareholder Activism Analytics Platform</title>
+    <meta name="description" content="Production-grade platform for tracking activist investors, campaigns, proxy battles, and event-study stock performance analytics">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+        header {
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+            color: white;
+            padding: 3rem 2rem;
+            text-align: center;
+        }
+        h1 { font-size: 2.5rem; margin-bottom: 0.5rem; }
+        .subtitle { font-size: 1.1rem; opacity: 0.95; font-weight: 300; }
+        .badges {
+            margin-top: 1rem;
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .badge {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            backdrop-filter: blur(10px);
+        }
+        .content { padding: 2rem; }
+        section { margin-bottom: 2.5rem; }
+        h2 {
+            color: #1e3a8a;
+            margin-bottom: 1rem;
+            font-size: 1.75rem;
+            border-left: 4px solid #3b82f6;
+            padding-left: 1rem;
+        }
+        ul { margin-left: 2rem; }
+        li { margin-bottom: 0.5rem; }
+        .tech-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        .tech-card {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 8px;
+            border-left: 3px solid #3b82f6;
+        }
+        .tech-card strong { display: block; color: #1e3a8a; margin-bottom: 0.25rem; }
+        code {
+            background: #f1f5f9;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        .cta {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+            border-radius: 8px;
+            margin-top: 2rem;
+        }
+        .cta a {
+            display: inline-block;
+            background: white;
+            color: #059669;
+            padding: 12px 32px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 600;
+            margin-top: 1rem;
+            transition: transform 0.2s;
+        }
+        .cta a:hover { transform: translateY(-2px); }
+        footer {
+            background: #1e293b;
+            color: #94a3b8;
+            padding: 1.5rem 2rem;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+        footer a { color: #60a5fa; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>⚡ Activist Terminal</h1>
+            <p class="subtitle">Production-grade Shareholder Activism Analytics Platform</p>
+            <div class="badges">
+                <span class="badge">Next.js 15</span>
+                <span class="badge">FastAPI</span>
+                <span class="badge">PostgreSQL</span>
+                <span class="badge">Prisma</span>
+                <span class="badge">Event Studies</span>
+            </div>
+        </header>
+
+        <div class="content">
+            <section>
+                <h2>🎯 What This Platform Answers</h2>
+                <ul>
+                    <li>Which activist investors are currently active?</li>
+                    <li>Which companies are being targeted and what demands are activists making?</li>
+                    <li>Which campaigns escalated to proxy fights?</li>
+                    <li>How many board seats were won, settled, or lost?</li>
+                    <li>How did stocks perform before campaigns, around announcements, and afterward?</li>
+                    <li>Which activists have the best hit rates by campaign type, sector, or outcome?</li>
+                </ul>
+            </section>
+
+            <section>
+                <h2>📊 Event-Study Methodology</h2>
+                <p><strong>Proper finance methodology</strong> — not naive price deltas:</p>
+                <ul>
+                    <li><strong>Market model:</strong> OLS regression with estimation window [-280, -30] trading days vs SPY</li>
+                    <li><strong>Minimum 150 observations</strong> required for statistical validity</li>
+                    <li><strong>CAR & BHAR:</strong> Cumulative Abnormal Returns and Buy-and-Hold Abnormal Returns</li>
+                    <li><strong>Trading-day offsets</strong> (not calendar days) for accurate windows</li>
+                    <li><strong>Materialized metrics</strong> keyed by (campaign, anchor event, benchmark, method, window)</li>
+                    <li><strong>Incremental recomputation</strong> gated by inputs hash</li>
+                </ul>
+            </section>
+
+            <section>
+                <h2>🏛️ Architecture Highlights</h2>
+                <div class="tech-grid">
+                    <div class="tech-card">
+                        <strong>Schema Split</strong>
+                        <p>Prisma owns <code>app</code> schema; Alembic manages <code>staging</code> schema</p>
+                    </div>
+                    <div class="tech-card">
+                        <strong>Event Sourcing</strong>
+                        <p>Append-only <code>campaign_events</code> table with provenance on every row</p>
+                    </div>
+                    <div class="tech-card">
+                        <strong>Entity Resolution</strong>
+                        <p>CIK → CUSIP → alias exact → trigram fuzzy cascade with human review queue</p>
+                    </div>
+                    <div class="tech-card">
+                        <strong>21-Table Schema</strong>
+                        <p>investors, campaigns, events, demands, proxy_fights, price_metrics, and more</p>
+                    </div>
+                </div>
+            </section>
+
+            <section>
+                <h2>📦 Repository Structure</h2>
+                <ul>
+                    <li><strong>web/</strong> — Next.js App Router with Prisma ORM</li>
+                    <li><strong>pipelines/</strong> — Python data ingestion & FastAPI analytics service</li>
+                    <li><strong>docker-compose.yml</strong> — Postgres + services orchestration</li>
+                    <li><strong>Makefile</strong> — Development shortcuts (<code>make dev</code>, <code>make test</code>)</li>
+                </ul>
+            </section>
+
+            <section>
+                <h2>⚙️ Tech Stack</h2>
+                <div class="tech-grid">
+                    <div class="tech-card">
+                        <strong>Frontend</strong>
+                        <p>Next.js 15, TypeScript, React Server Components, lightweight-charts</p>
+                    </div>
+                    <div class="tech-card">
+                        <strong>Backend</strong>
+                        <p>FastAPI (Python 3.12), SQLAlchemy Core, pandas, scipy, numpy</p>
+                    </div>
+                    <div class="tech-card">
+                        <strong>Database</strong>
+                        <p>PostgreSQL 16, Prisma (app schema), Alembic (staging schema)</p>
+                    </div>
+                    <div class="tech-card">
+                        <strong>Testing</strong>
+                        <p>Golden-number event-study integration tests with pytest</p>
+                    </div>
+                </div>
+            </section>
+
+            <div class="cta">
+                <h2 style="color: white; border: none; padding: 0; margin-bottom: 0.5rem;">🚀 Get Started</h2>
+                <p style="margin-bottom: 1rem;">Explore the full source code and documentation on GitHub</p>
+                <a href="https://github.com/grisheet/activist-terminal" target="_blank">View on GitHub →</a>
+            </div>
+        </div>
+
+        <footer>
+            <p>Built by <a href="https://github.com/grisheet">grisheet</a> | <a href="https://github.com/grisheet/activist-terminal">GitHub Repository</a> | MIT License</p>
+        </footer>
+    </div>
+</body>
+</html>
