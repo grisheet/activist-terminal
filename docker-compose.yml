@@ -1,0 +1,54 @@
+version: '3.9'
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: activist_terminal
+      POSTGRES_USER: activist
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devpassword}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./scripts/init-extensions.sql:/docker-entrypoint-initdb.d/01-extensions.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U activist -d activist_terminal"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://activist:${POSTGRES_PASSWORD:-devpassword}@db:5432/activist_terminal
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-devsecret}
+      NEXTAUTH_URL: http://localhost:3000
+    ports:
+      - "3000:3000"
+
+  pipelines:
+    build:
+      context: ./pipelines
+      dockerfile: Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg2://activist:${POSTGRES_PASSWORD:-devpassword}@db:5432/activist_terminal
+      PYTHONPATH: /app/src
+    volumes:
+      - ./pipelines:/app
+    command: ["python", "-m", "activist_pipelines.jobs.ingest_filings", "--help"]
+    profiles:
+      - tools
+
+volumes:
+  pgdata:
