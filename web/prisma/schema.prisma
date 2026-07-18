@@ -1,0 +1,230 @@
+// Activist Terminal — Prisma schema
+// Prisma owns the `app` schema exclusively.
+// Python writes via SQLAlchemy Core ON CONFLICT upserts (no model declarations).
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  schemas  = ["app"]
+}
+
+// ---------------------------------------------------------------------------
+// Investor
+// ---------------------------------------------------------------------------
+model Investor {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        String
+  aliases     String[]
+  cik         String?  @unique
+  website     String?
+  hqCountry   String?  @map("hq_country")
+  fundType    String?  @map("fund_type")
+  aum         Decimal?  @db.Decimal(18, 2)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  campaigns   Campaign[]
+
+  @@schema("app")
+  @@map("investors")
+}
+
+// ---------------------------------------------------------------------------
+// Company
+// ---------------------------------------------------------------------------
+model Company {
+  id          String   @id @default(cuid())
+  ticker      String   @unique
+  name        String
+  aliases     String[]
+  cik         String?  @unique
+  cusip       String?  @unique
+  exchange    String?
+  sector      String?
+  industry    String?
+  sic         String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  campaigns    Campaign[]
+  priceBars    PriceBar[]
+
+  @@schema("app")
+  @@map("companies")
+}
+
+// ---------------------------------------------------------------------------
+// Campaign — aggregate root
+// ---------------------------------------------------------------------------
+model Campaign {
+  id              String    @id @default(cuid())
+  investorId      String    @map("investor_id")
+  companyId       String    @map("company_id")
+  status          String    @default("active")  // active|settled|won|lost|withdrawn
+  t0              DateTime? @map("t0")           // first public disclosure date
+  stakePercent    Decimal?  @map("stake_percent") @db.Decimal(6, 4)
+  boardSeatsWon   Int       @default(0) @map("board_seats_won")
+  boardSeatsDemanded Int    @default(0) @map("board_seats_demanded")
+  outcomeNote     String?   @map("outcome_note")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  investor        Investor  @relation(fields: [investorId], references: [id])
+  company         Company   @relation(fields: [companyId], references: [id])
+  events          CampaignEvent[]
+  demands         CampaignDemand[]
+  proxyFight      ProxyFight?
+  priceMetrics    CampaignPriceMetric[]
+  boardChanges    BoardSeatChange[]
+
+  @@unique([investorId, companyId])
+  @@schema("app")
+  @@map("campaigns")
+}
+
+// ---------------------------------------------------------------------------
+// CampaignEvent — append-only timeline
+// ---------------------------------------------------------------------------
+model CampaignEvent {
+  id              String    @id @default(cuid())
+  campaignId      String    @map("campaign_id")
+  eventType       String    @map("event_type")  // disclosure|demand|escalation|settlement|board_seat
+  eventDate       DateTime  @map("event_date")
+  provenance      String?                        // filing URL or accession number
+  accessionNo     String?   @map("accession_no")
+  headline        String?
+  notes           String?
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  campaign        Campaign  @relation(fields: [campaignId], references: [id])
+  demands         CampaignDemand[]
+
+  @@schema("app")
+  @@map("campaign_events")
+}
+
+// ---------------------------------------------------------------------------
+// CampaignDemand
+// ---------------------------------------------------------------------------
+model CampaignDemand {
+  id              String    @id @default(cuid())
+  campaignId      String    @map("campaign_id")
+  eventId         String?   @map("event_id")
+  demandType      String    @map("demand_type")  // sale|board_seats|ceo_removal|dividend|spinoff|buyback|other
+  detail          String?
+  met             Boolean   @default(false)
+
+  campaign        Campaign  @relation(fields: [campaignId], references: [id])
+  event           CampaignEvent? @relation(fields: [eventId], references: [id])
+
+  @@schema("app")
+  @@map("campaign_demands")
+}
+
+// ---------------------------------------------------------------------------
+// ProxyFight
+// ---------------------------------------------------------------------------
+model ProxyFight {
+  id              String    @id @default(cuid())
+  campaignId      String    @unique @map("campaign_id")
+  filingDate      DateTime? @map("filing_date")
+  meetingDate     DateTime? @map("meeting_date")
+  seatsContested  Int       @default(0) @map("seats_contested")
+  seatsWon        Int       @default(0) @map("seats_won")
+  outcome         String?                         // won|lost|settled_before_vote|withdrawn
+  settlementDate  DateTime? @map("settlement_date")
+
+  campaign        Campaign  @relation(fields: [campaignId], references: [id])
+
+  @@schema("app")
+  @@map("proxy_fights")
+}
+
+// ---------------------------------------------------------------------------
+// BoardSeatChange
+// ---------------------------------------------------------------------------
+model BoardSeatChange {
+  id              String    @id @default(cuid())
+  campaignId      String    @map("campaign_id")
+  directorName    String    @map("director_name")
+  changeType      String    @map("change_type")  // appointed|resigned|removed|not_renominated
+  effectiveDate   DateTime? @map("effective_date")
+  nominatedBy     String?   @map("nominated_by")  // activist|company|joint
+  notes           String?
+
+  campaign        Campaign  @relation(fields: [campaignId], references: [id])
+
+  @@schema("app")
+  @@map("board_seat_changes")
+}
+
+// ---------------------------------------------------------------------------
+// PriceBar — daily OHLCV
+// ---------------------------------------------------------------------------
+model PriceBar {
+  id          String    @id @default(cuid())
+  companyId   String    @map("company_id")
+  ticker      String
+  tradingDate DateTime  @map("trading_date") @db.Date
+  open        Decimal   @db.Decimal(18, 6)
+  high        Decimal   @db.Decimal(18, 6)
+  low         Decimal   @db.Decimal(18, 6)
+  close       Decimal   @db.Decimal(18, 6)
+  adjClose    Decimal   @map("adj_close") @db.Decimal(18, 6)
+  volume      BigInt
+  source      String    @default("yfinance")
+
+  company     Company   @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, tradingDate])
+  @@schema("app")
+  @@map("price_bars")
+}
+
+// ---------------------------------------------------------------------------
+// BenchmarkReturn — daily benchmark (SPY etc.)
+// ---------------------------------------------------------------------------
+model BenchmarkReturn {
+  id          String    @id @default(cuid())
+  ticker      String
+  tradingDate DateTime  @map("trading_date") @db.Date
+  logReturn   Decimal   @map("log_return") @db.Decimal(18, 10)
+
+  @@unique([ticker, tradingDate])
+  @@schema("app")
+  @@map("benchmark_returns")
+}
+
+// ---------------------------------------------------------------------------
+// CampaignPriceMetric — materialized event-study results
+// ---------------------------------------------------------------------------
+model CampaignPriceMetric {
+  id              String    @id @default(cuid())
+  campaignId      String    @map("campaign_id")
+  anchorEventId   String    @map("anchor_event_id")
+  anchorDate      DateTime  @map("anchor_date")
+  benchmark       String    @default("SPY")
+  method          String    @default("market_model")  // market_model|benchmark_adjusted
+  windowStart     Int       @map("window_start")   // trading days relative to anchor
+  windowEnd       Int       @map("window_end")
+  car             Decimal?  @db.Decimal(10, 6)    // cumulative abnormal return
+  bhar            Decimal?  @db.Decimal(10, 6)    // buy-and-hold abnormal return
+  alpha           Decimal?  @db.Decimal(10, 6)
+  beta            Decimal?  @db.Decimal(10, 6)
+  rSquared        Decimal?  @map("r_squared") @db.Decimal(6, 4)
+  nObs            Int?      @map("n_obs")
+  inputsHash      String    @map("inputs_hash")   // for incremental recomputation
+  computedAt      DateTime  @default(now()) @map("computed_at")
+
+  campaign        Campaign  @relation(fields: [campaignId], references: [id])
+
+  @@unique([campaignId, anchorEventId, benchmark, method, windowStart, windowEnd])
+  @@schema("app")
+  @@map("campaign_price_metrics")
+}
